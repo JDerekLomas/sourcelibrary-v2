@@ -4,6 +4,9 @@ import { Book } from '@/lib/types';
 import { Library, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
+// Force dynamic rendering (no static generation)
+export const dynamic = 'force-dynamic';
+
 async function getBooks(): Promise<Book[]> {
   const db = await getDb();
 
