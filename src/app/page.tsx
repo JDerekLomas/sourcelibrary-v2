@@ -8,33 +8,38 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 async function getBooks(): Promise<Book[]> {
-  const db = await getDb();
+  try {
+    const db = await getDb();
 
-  const books = await db.collection('books').aggregate([
-    {
-      $lookup: {
-        from: 'pages',
-        localField: 'id',
-        foreignField: 'book_id',
-        as: 'pages_array'
+    const books = await db.collection('books').aggregate([
+      {
+        $lookup: {
+          from: 'pages',
+          localField: 'id',
+          foreignField: 'book_id',
+          as: 'pages_array'
+        }
+      },
+      {
+        $addFields: {
+          pages_count: { $size: '$pages_array' }
+        }
+      },
+      {
+        $project: {
+          pages_array: 0
+        }
+      },
+      {
+        $sort: { title: 1 }
       }
-    },
-    {
-      $addFields: {
-        pages_count: { $size: '$pages_array' }
-      }
-    },
-    {
-      $project: {
-        pages_array: 0
-      }
-    },
-    {
-      $sort: { title: 1 }
-    }
-  ]).toArray();
+    ]).toArray();
 
-  return books as Book[];
+    return books as Book[];
+  } catch (error) {
+    console.error('Error fetching books:', error);
+    return [];
+  }
 }
 
 export default async function HomePage() {
