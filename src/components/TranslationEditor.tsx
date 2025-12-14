@@ -127,55 +127,92 @@ function ImageWithMagnifier({ src, alt }: { src: string; alt: string }) {
   const [showMagnifier, setShowMagnifier] = useState(false);
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
-  const imageRef = useRef<HTMLDivElement>(null);
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
-  const magnifierSize = 180;
-  const zoomLevel = 2.5;
+  const magnifierSize = 200;
+  const zoomLevel = 3;
+
+  useEffect(() => {
+    // Get actual rendered image dimensions
+    const updateDimensions = () => {
+      if (imgRef.current) {
+        const rect = imgRef.current.getBoundingClientRect();
+        setImageDimensions({ width: rect.width, height: rect.height });
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!imageRef.current) return;
+    if (!containerRef.current || !imgRef.current) return;
 
-    const rect = imageRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const imgRect = imgRef.current.getBoundingClientRect();
 
-    // Position as percentage for background-position
-    const xPercent = (x / rect.width) * 100;
-    const yPercent = (y / rect.height) * 100;
+    // Get cursor position relative to container
+    const containerX = e.clientX - containerRect.left;
+    const containerY = e.clientY - containerRect.top;
 
-    setCursorPosition({ x, y });
-    setMagnifierPosition({ x: xPercent, y: yPercent });
+    // Get cursor position relative to the actual image
+    const imgX = e.clientX - imgRect.left;
+    const imgY = e.clientY - imgRect.top;
+
+    // Check if cursor is over the actual image
+    const isOverImage = imgX >= 0 && imgX <= imgRect.width && imgY >= 0 && imgY <= imgRect.height;
+
+    if (isOverImage) {
+      setCursorPosition({ x: containerX, y: containerY });
+
+      // Calculate background position as percentage of image dimensions
+      const xPercent = (imgX / imgRect.width) * 100;
+      const yPercent = (imgY / imgRect.height) * 100;
+      setMagnifierPosition({ x: xPercent, y: yPercent });
+      setShowMagnifier(true);
+    } else {
+      setShowMagnifier(false);
+    }
   };
 
   return (
     <div
-      ref={imageRef}
-      className="relative w-full h-full cursor-crosshair"
-      onMouseEnter={() => setShowMagnifier(true)}
-      onMouseLeave={() => setShowMagnifier(false)}
+      ref={containerRef}
+      className="relative w-full h-full"
       onMouseMove={handleMouseMove}
+      onMouseLeave={() => setShowMagnifier(false)}
     >
-      <Image
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={imgRef}
         src={src}
         alt={alt}
-        fill
-        className="object-contain"
-        sizes="50vw"
+        className="w-full h-full object-contain cursor-crosshair"
+        onLoad={() => {
+          if (imgRef.current) {
+            const rect = imgRef.current.getBoundingClientRect();
+            setImageDimensions({ width: rect.width, height: rect.height });
+          }
+        }}
       />
 
       {/* Magnifier lens */}
       {showMagnifier && (
         <div
-          className="absolute pointer-events-none rounded-full shadow-lg"
+          className="absolute pointer-events-none rounded-full overflow-hidden"
           style={{
             width: magnifierSize,
             height: magnifierSize,
             left: cursorPosition.x - magnifierSize / 2,
             top: cursorPosition.y - magnifierSize / 2,
-            border: '3px solid var(--border-medium)',
+            border: '4px solid white',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
             backgroundImage: `url(${src})`,
-            backgroundSize: `${zoomLevel * 100}%`,
-            backgroundPosition: `${magnifierPosition.x}% ${magnifierPosition.y}%`,
+            backgroundSize: `${imageDimensions.width * zoomLevel}px ${imageDimensions.height * zoomLevel}px`,
+            backgroundPosition: `${-magnifierPosition.x * imageDimensions.width * zoomLevel / 100 + magnifierSize / 2}px ${-magnifierPosition.y * imageDimensions.height * zoomLevel / 100 + magnifierSize / 2}px`,
             backgroundRepeat: 'no-repeat',
             backgroundColor: 'var(--bg-white)',
           }}
@@ -184,7 +221,7 @@ function ImageWithMagnifier({ src, alt }: { src: string; alt: string }) {
 
       {/* Zoom hint */}
       {!showMagnifier && (
-        <div className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded text-xs" style={{ background: 'rgba(0,0,0,0.5)', color: 'white' }}>
+        <div className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded text-xs" style={{ background: 'rgba(0,0,0,0.6)', color: 'white' }}>
           <ZoomIn className="w-3 h-3" />
           Hover to zoom
         </div>
