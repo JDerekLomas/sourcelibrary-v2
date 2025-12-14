@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Info } from 'lucide-react';
 
 interface NotesRendererProps {
   text: string;
@@ -53,27 +52,28 @@ function parseTextWithNotes(text: string): ParsedSegment[] {
 export default function NotesRenderer({ text, className = '' }: NotesRendererProps) {
   const segments = useMemo(() => parseTextWithNotes(text), [text]);
 
+  if (!text) {
+    return (
+      <div className={`text-[var(--text-muted)] italic ${className}`}>
+        No content yet...
+      </div>
+    );
+  }
+
   return (
-    <div className={`prose prose-stone max-w-none ${className}`}>
+    <div className={`prose-manuscript ${className}`}>
       {segments.map((segment, index) => {
         if (segment.type === 'note') {
           return (
-            <span
-              key={index}
-              className="inline-flex items-start gap-1 bg-amber-50 border border-amber-200 rounded px-2 py-1 text-sm text-amber-800 my-1"
-            >
-              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <span>{segment.content}</span>
+            <span key={index} className="note-annotation">
+              {segment.content}
             </span>
           );
         }
 
         if (segment.type === 'page_number') {
           return (
-            <span
-              key={index}
-              className="inline-block bg-stone-100 border border-stone-200 rounded px-2 py-0.5 text-xs font-mono text-stone-600 my-1"
-            >
+            <span key={index} className="note-page-number">
               Page {segment.content}
             </span>
           );
