@@ -37,7 +37,26 @@ export async function performOCR(
 
   const imageBuffer = await imageResponse.arrayBuffer();
   const base64Image = Buffer.from(imageBuffer).toString('base64');
-  const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+  let mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+  // Gemini only supports these image types
+  const supportedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
+  // Clean up mimeType (remove charset, etc.)
+  mimeType = mimeType.split(';')[0].trim();
+
+  // If mimeType is not supported, try to infer from URL or default to jpeg
+  if (!supportedMimeTypes.includes(mimeType)) {
+    console.log('Unsupported mimeType:', mimeType, '- inferring from URL');
+    if (imageUrl.toLowerCase().includes('.png')) {
+      mimeType = 'image/png';
+    } else if (imageUrl.toLowerCase().includes('.webp')) {
+      mimeType = 'image/webp';
+    } else {
+      mimeType = 'image/jpeg'; // Default to jpeg
+    }
+  }
+
   console.log('Image fetched, size:', imageBuffer.byteLength, 'mimeType:', mimeType);
 
   console.log('Calling Gemini API...');
