@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 interface NotesRendererProps {
   text: string;
@@ -103,11 +104,34 @@ export default function NotesRenderer({ text, className = '' }: NotesRendererPro
             );
           }
 
-          // Regular text
+          // Regular text - render with markdown
           return (
-            <span key={index} className="whitespace-pre-wrap">
+            <ReactMarkdown
+              key={index}
+              components={{
+                // Customize rendering to be inline-friendly
+                p: ({ children }) => <span className="whitespace-pre-wrap">{children}</span>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+                h1: ({ children }) => <h1 className="text-2xl font-serif font-bold mt-4 mb-2">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-xl font-serif font-bold mt-3 mb-2">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-lg font-serif font-semibold mt-2 mb-1">{children}</h3>,
+                ul: ({ children }) => <ul className="list-disc ml-5 my-2">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal ml-5 my-2">{children}</ol>,
+                li: ({ children }) => <li className="my-0.5">{children}</li>,
+                blockquote: ({ children }) => (
+                  <blockquote className="border-l-2 border-amber-300 pl-3 my-2 italic text-stone-600">
+                    {children}
+                  </blockquote>
+                ),
+                code: ({ children }) => (
+                  <code className="bg-stone-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>
+                ),
+                hr: () => <hr className="my-4 border-stone-200" />,
+              }}
+            >
               {segment.content}
-            </span>
+            </ReactMarkdown>
           );
         })}
       </div>
