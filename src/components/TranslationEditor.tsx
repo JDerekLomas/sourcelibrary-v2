@@ -469,9 +469,38 @@ export default function TranslationEditor({
               {translationText ? (
                 <NotesRenderer text={translationText} />
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center" style={{ color: 'var(--text-muted)' }}>
-                  <p className="text-lg mb-2" style={{ fontFamily: 'Cormorant Garamond, Georgia, serif' }}>No translation yet</p>
-                  <p className="text-sm">Switch to Edit mode to run OCR and translation.</p>
+                <div className="h-full flex flex-col items-center justify-center text-center px-8">
+                  <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-medium mb-2" style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', color: 'var(--text-primary)' }}>
+                    Ready to translate this page?
+                  </h3>
+                  <p className="text-sm mb-6 max-w-xs" style={{ color: 'var(--text-muted)' }}>
+                    AI will transcribe the original {book.language || 'text'} and translate it to English.
+                  </p>
+                  <button
+                    onClick={() => handleProcess('all')}
+                    disabled={processing !== null}
+                    className="flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-white transition-all hover:opacity-90 disabled:opacity-50"
+                    style={{ background: 'var(--accent-rust, #c45d3a)' }}
+                  >
+                    {processing ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        {processing === 'ocr' ? 'Transcribing...' : processing === 'translation' ? 'Translating...' : 'Processing...'}
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Start Translation
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>
