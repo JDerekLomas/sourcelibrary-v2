@@ -261,16 +261,28 @@ function SettingsModal({ isOpen, onClose, title, promptType, selectedPromptId, o
 }
 
 // Magnifier component for zooming into the source image
-function ImageWithMagnifier({ src, alt }: { src: string; alt: string }) {
+function ImageWithMagnifier({ src, thumbnail, alt }: { src: string; thumbnail?: string; alt: string }) {
   const [showMagnifier, setShowMagnifier] = useState(false);
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [fullImageLoaded, setFullImageLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
   const magnifierSize = 200;
   const zoomLevel = 3;
+
+  // Use thumbnail for display, full image for magnifier
+  const displaySrc = thumbnail || src;
+  const magnifierSrc = src;
+
+  useEffect(() => {
+    // Reset loaded state when src changes
+    setIsLoaded(false);
+    setFullImageLoaded(false);
+  }, [src]);
 
   useEffect(() => {
     // Get actual rendered image dimensions
@@ -284,10 +296,21 @@ function ImageWithMagnifier({ src, alt }: { src: string; alt: string }) {
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
+  }, [isLoaded]);
+
+  // Preload full image for magnifier when thumbnail is used
+  useEffect(() => {
+    if (thumbnail && src !== thumbnail) {
+      const img = new window.Image();
+      img.onload = () => setFullImageLoaded(true);
+      img.src = src;
+    } else {
+      setFullImageLoaded(true);
+    }
+  }, [src, thumbnail]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current || !imgRef.current) return;
+    if (!containerRef.current || !imgRef.current || !fullImageLoaded) return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
     const imgRect = imgRef.current.getBoundingClientRect();
@@ -323,13 +346,22 @@ function ImageWithMagnifier({ src, alt }: { src: string; alt: string }) {
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setShowMagnifier(false)}
     >
+      {/* Loading skeleton */}
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-stone-100 animate-pulse">
+          <div className="text-stone-400 text-sm">Loading...</div>
+        </div>
+      )}
+
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={imgRef}
-        src={src}
+        src={displaySrc}
         alt={alt}
-        className="w-full h-full object-contain cursor-crosshair"
+        loading="lazy"
+        className={`w-full h-full object-contain cursor-crosshair transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => {
+          setIsLoaded(true);
           if (imgRef.current) {
             const rect = imgRef.current.getBoundingClientRect();
             setImageDimensions({ width: rect.width, height: rect.height });
@@ -337,8 +369,8 @@ function ImageWithMagnifier({ src, alt }: { src: string; alt: string }) {
         }}
       />
 
-      {/* Magnifier lens */}
-      {showMagnifier && (
+      {/* Magnifier lens - uses full resolution image */}
+      {showMagnifier && fullImageLoaded && (
         <div
           className="absolute pointer-events-none rounded-full overflow-hidden"
           style={{
@@ -348,7 +380,7 @@ function ImageWithMagnifier({ src, alt }: { src: string; alt: string }) {
             top: cursorPosition.y - magnifierSize / 2,
             border: '4px solid white',
             boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-            backgroundImage: `url(${src})`,
+            backgroundImage: `url(${magnifierSrc})`,
             backgroundSize: `${imageDimensions.width * zoomLevel}px ${imageDimensions.height * zoomLevel}px`,
             backgroundPosition: `${-magnifierPosition.x * imageDimensions.width * zoomLevel / 100 + magnifierSize / 2}px ${-magnifierPosition.y * imageDimensions.height * zoomLevel / 100 + magnifierSize / 2}px`,
             backgroundRepeat: 'no-repeat',
@@ -358,10 +390,10 @@ function ImageWithMagnifier({ src, alt }: { src: string; alt: string }) {
       )}
 
       {/* Zoom hint */}
-      {!showMagnifier && (
+      {isLoaded && !showMagnifier && (
         <div className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded text-xs" style={{ background: 'rgba(0,0,0,0.6)', color: 'white' }}>
           <ZoomIn className="w-3 h-3" />
-          Hover to zoom
+          {fullImageLoaded ? 'Hover to zoom' : 'Loading HD...'}
         </div>
       )}
     </div>
@@ -411,6 +443,24 @@ export default function TranslationEditor({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [previousPage, nextPage, onNavigate]);
+
+  // Prefetch adjacent page images for faster navigation
+  useEffect(() => {
+    const prefetchImage = (url: string | undefined) => {
+      if (url) {
+        const img = new window.Image();
+        img.src = url;
+      }
+    };
+
+    // Prefetch thumbnail or compressed versions first (faster)
+    if (previousPage) {
+      prefetchImage(previousPage.thumbnail || previousPage.compressed_photo || previousPage.photo);
+    }
+    if (nextPage) {
+      prefetchImage(nextPage.thumbnail || nextPage.compressed_photo || nextPage.photo);
+    }
+  }, [previousPage, nextPage]);
 
   const handleSplitPage = async (side: 'left' | 'right') => {
     if (splitting) return;
@@ -597,7 +647,7 @@ export default function TranslationEditor({
             <div className="flex-1 overflow-hidden p-4">
               <div className="relative w-full h-full rounded-lg overflow-hidden" style={{ background: 'var(--bg-white)', border: '1px solid var(--border-light)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                 {page.photo ? (
-                  <ImageWithMagnifier src={page.photo} alt={`Page ${page.page_number}`} />
+                  <ImageWithMagnifier src={page.photo} thumbnail={page.thumbnail || page.compressed_photo} alt={`Page ${page.page_number}`} />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
                     No image available
@@ -813,7 +863,7 @@ export default function TranslationEditor({
           <div className="flex-1 overflow-hidden p-4">
             <div className="relative w-full h-full rounded-lg overflow-hidden" style={{ background: 'var(--bg-white)', border: '1px solid var(--border-light)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               {page.photo ? (
-                <ImageWithMagnifier src={page.photo} alt={`Page ${page.page_number}`} />
+                <ImageWithMagnifier src={page.photo} thumbnail={page.thumbnail || page.compressed_photo} alt={`Page ${page.page_number}`} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
                   No image available
