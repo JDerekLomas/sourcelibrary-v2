@@ -275,7 +275,11 @@ function ImageWithMagnifier({ src, thumbnail, alt }: { src: string; thumbnail?: 
   const zoomLevel = 3;
 
   // Use thumbnail for display, full image for magnifier
-  const displaySrc = thumbnail || src;
+  // If no thumbnail, use resize API to generate one on-the-fly
+  const getResizedUrl = (url: string, width: number = 600) => {
+    return `/api/image?url=${encodeURIComponent(url)}&w=${width}&q=75`;
+  };
+  const displaySrc = thumbnail || getResizedUrl(src, 600);
   const magnifierSrc = src;
 
   useEffect(() => {
