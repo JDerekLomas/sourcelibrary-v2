@@ -576,7 +576,9 @@ export default function TranslationEditor({
 
   // READ MODE - Clean reading experience
   if (mode === 'read') {
-    const columnWidth = showOcrInRead ? 'md:w-1/3' : 'md:w-1/2';
+    // Image column is narrow, text columns take the rest
+    const imageWidth = 'md:w-1/4';
+    const textWidth = showOcrInRead ? 'md:w-[37.5%]' : 'md:w-3/4';
 
     return (
       <div className="h-screen flex flex-col" style={{ background: 'var(--bg-cream)' }}>
@@ -649,7 +651,7 @@ export default function TranslationEditor({
         {/* Reading layout */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Source Image */}
-          <div className={`w-full ${columnWidth} flex flex-col`} style={{ background: 'var(--bg-warm)', borderRight: '1px solid var(--border-light)' }}>
+          <div className={`w-full ${imageWidth} flex flex-col`} style={{ background: 'var(--bg-warm)', borderRight: '1px solid var(--border-light)' }}>
             <div className="px-4 py-2 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Image</span>
             </div>
@@ -668,7 +670,7 @@ export default function TranslationEditor({
 
           {/* OCR Text (optional middle column) */}
           {showOcrInRead && ocrText && (
-            <div className={`w-full ${columnWidth} flex flex-col`} style={{ background: 'var(--bg-cream)', borderRight: '1px solid var(--border-light)' }}>
+            <div className={`w-full ${textWidth} flex flex-col`} style={{ background: 'var(--bg-cream)', borderRight: '1px solid var(--border-light)' }}>
               <div className="px-4 py-2 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{book.language || 'Original'}</span>
               </div>
@@ -681,7 +683,7 @@ export default function TranslationEditor({
           )}
 
           {/* Translation */}
-          <div className={`w-full ${columnWidth} flex flex-col`} style={{ background: 'var(--bg-white)' }}>
+          <div className={`w-full ${textWidth} flex flex-col`} style={{ background: 'var(--bg-white)' }}>
             <div className="px-4 py-2 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
               <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>English</span>
               {translationText && (
