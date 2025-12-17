@@ -54,28 +54,28 @@ export default async function HomePage() {
     <div className="min-h-screen bg-stone-50">
       {/* Header */}
       <header className="bg-gradient-to-b from-stone-900 to-stone-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
           <div className="flex items-center gap-3 mb-4">
-            <Library className="w-8 h-8 text-amber-400" />
-            <h1 className="text-3xl font-serif font-bold">Source Library</h1>
+            <Library className="w-7 sm:w-8 h-7 sm:h-8 text-amber-400" />
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold">Source Library</h1>
           </div>
-          <p className="text-xl text-stone-300 max-w-2xl">
+          <p className="text-lg sm:text-xl text-stone-300 max-w-2xl">
             Digitizing and translating rare Hermetic, esoteric, and humanist texts
             to make them accessible to scholars, seekers, and AI systems.
           </p>
 
           {/* Stats */}
-          <div className="flex gap-8 mt-8">
+          <div className="flex flex-wrap gap-6 sm:gap-8 mt-6 sm:mt-8">
             <div>
-              <div className="text-3xl font-bold text-amber-400">{totalBooks}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-amber-400">{totalBooks}</div>
               <div className="text-sm text-stone-400">Books</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-amber-400">{totalPages.toLocaleString()}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-amber-400">{totalPages.toLocaleString()}</div>
               <div className="text-sm text-stone-400">Pages</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-amber-400">{languages.length}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-amber-400">{languages.length}</div>
               <div className="text-sm text-stone-400">Languages</div>
             </div>
           </div>
@@ -84,19 +84,19 @@ export default async function HomePage() {
 
       {/* Features */}
       <div className="bg-white border-b border-stone-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center gap-6 text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm">
             <div className="flex items-center gap-2 text-stone-600">
-              <Sparkles className="w-4 h-4 text-amber-600" />
+              <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0" />
               <span>AI-powered OCR & Translation</span>
             </div>
             <div className="flex items-center gap-2 text-stone-600">
-              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium flex-shrink-0">
                 [[notes]]
               </span>
               <span>Annotated scholarly output</span>
             </div>
-            <div className="flex items-center gap-2 text-stone-600">
+            <div className="hidden sm:flex items-center gap-2 text-stone-600">
               <span>Page-to-page context continuity</span>
             </div>
           </div>
@@ -104,11 +104,11 @@ export default async function HomePage() {
       </div>
 
       {/* Book Grid */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-serif font-bold text-stone-900">Library Collection</h2>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <h2 className="text-xl sm:text-2xl font-serif font-bold text-stone-900">Library Collection</h2>
           <div className="flex items-center gap-4">
-            <select className="px-3 py-2 border border-stone-200 rounded-lg text-sm bg-white">
+            <select className="px-3 py-2.5 border border-stone-200 rounded-lg text-sm bg-white min-w-[140px]">
               <option>All Languages</option>
               {languages.map(lang => (
                 <option key={lang} value={lang}>{lang}</option>

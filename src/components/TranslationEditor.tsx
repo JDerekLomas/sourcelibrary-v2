@@ -16,9 +16,11 @@ import {
   Scissors,
   ArrowLeftRight,
   Columns,
-  BookOpen
+  BookOpen,
+  Maximize2
 } from 'lucide-react';
 import NotesRenderer from './NotesRenderer';
+import FullscreenImageViewer from './FullscreenImageViewer';
 import type { Page, Book, Prompt } from '@/lib/types';
 
 interface TranslationEditorProps {
@@ -261,13 +263,18 @@ function SettingsModal({ isOpen, onClose, title, promptType, selectedPromptId, o
 }
 
 // Magnifier component for zooming into the source image
+// Desktop: hover to show magnifier lens, click HD button for fullscreen
+// Mobile/Touch: tap to open fullscreen viewer
 function ImageWithMagnifier({ src, thumbnail, alt }: { src: string; thumbnail?: string; alt: string }) {
   const [showMagnifier, setShowMagnifier] = useState(false);
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [fullImageDimensions, setFullImageDimensions] = useState({ width: 0, height: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
   const [fullImageLoaded, setFullImageLoaded] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [showFullscreen, setShowFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -282,10 +289,26 @@ function ImageWithMagnifier({ src, thumbnail, alt }: { src: string; thumbnail?: 
   const displaySrc = thumbnail || getResizedUrl(src, 400);
   const magnifierSrc = src;
 
+  // Detect touch device on mount
+  useEffect(() => {
+    const checkTouch = () => {
+      setIsTouchDevice(
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0 ||
+        window.matchMedia('(pointer: coarse)').matches
+      );
+    };
+    checkTouch();
+    // Re-check on resize (for responsive testing)
+    window.addEventListener('resize', checkTouch);
+    return () => window.removeEventListener('resize', checkTouch);
+  }, []);
+
   useEffect(() => {
     // Reset loaded state when src changes
     setIsLoaded(false);
     setFullImageLoaded(false);
+    setFullImageDimensions({ width: 0, height: 0 });
   }, [src]);
 
   useEffect(() => {
@@ -302,18 +325,20 @@ function ImageWithMagnifier({ src, thumbnail, alt }: { src: string; thumbnail?: 
     return () => window.removeEventListener('resize', updateDimensions);
   }, [isLoaded]);
 
-  // Preload full image for magnifier when thumbnail is used
+  // Preload full image for magnifier and get its natural dimensions
   useEffect(() => {
-    if (thumbnail && src !== thumbnail) {
-      const img = new window.Image();
-      img.onload = () => setFullImageLoaded(true);
-      img.src = src;
-    } else {
+    const img = new window.Image();
+    img.onload = () => {
       setFullImageLoaded(true);
-    }
-  }, [src, thumbnail]);
+      setFullImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = src;
+  }, [src]);
 
+  // Desktop: mouse move for magnifier
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Skip magnifier on touch devices
+    if (isTouchDevice) return;
     if (!containerRef.current || !imgRef.current || !fullImageLoaded) return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
@@ -343,64 +368,112 @@ function ImageWithMagnifier({ src, thumbnail, alt }: { src: string; thumbnail?: 
     }
   };
 
+  // Mobile: tap to open fullscreen
+  const handleClick = () => {
+    if (isTouchDevice && isLoaded) {
+      setShowFullscreen(true);
+    }
+  };
+
+  // Calculate magnifier background size using full image aspect ratio
+  // Scale it so the displayed area matches what we're showing
+  const getMagnifierBackgroundSize = () => {
+    if (!fullImageDimensions.width || !imageDimensions.width) {
+      return `${imageDimensions.width * zoomLevel}px ${imageDimensions.height * zoomLevel}px`;
+    }
+    // Use the displayed image dimensions scaled by zoom level
+    // This ensures proper 1:1 mapping between cursor position and magnified area
+    return `${imageDimensions.width * zoomLevel}px ${imageDimensions.height * zoomLevel}px`;
+  };
+
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full h-full"
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => setShowMagnifier(false)}
-    >
-      {/* Loading skeleton */}
-      {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-stone-100 animate-pulse">
-          <div className="text-stone-400 text-sm">Loading...</div>
-        </div>
-      )}
+    <>
+      <div
+        ref={containerRef}
+        className="relative w-full h-full"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setShowMagnifier(false)}
+        onClick={handleClick}
+      >
+        {/* Loading skeleton */}
+        {!isLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-stone-100 animate-pulse">
+            <div className="text-stone-400 text-sm">Loading...</div>
+          </div>
+        )}
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        ref={imgRef}
-        src={displaySrc}
-        alt={alt}
-        loading="lazy"
-        className={`w-full h-full object-contain cursor-crosshair transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-        onLoad={() => {
-          setIsLoaded(true);
-          if (imgRef.current) {
-            const rect = imgRef.current.getBoundingClientRect();
-            setImageDimensions({ width: rect.width, height: rect.height });
-          }
-        }}
-      />
-
-      {/* Magnifier lens - uses full resolution image */}
-      {showMagnifier && fullImageLoaded && (
-        <div
-          className="absolute pointer-events-none rounded-full overflow-hidden"
-          style={{
-            width: magnifierSize,
-            height: magnifierSize,
-            left: cursorPosition.x - magnifierSize / 2,
-            top: cursorPosition.y - magnifierSize / 2,
-            border: '4px solid white',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-            backgroundImage: `url(${magnifierSrc})`,
-            backgroundSize: `${imageDimensions.width * zoomLevel}px ${imageDimensions.height * zoomLevel}px`,
-            backgroundPosition: `${-magnifierPosition.x * imageDimensions.width * zoomLevel / 100 + magnifierSize / 2}px ${-magnifierPosition.y * imageDimensions.height * zoomLevel / 100 + magnifierSize / 2}px`,
-            backgroundRepeat: 'no-repeat',
-            backgroundColor: 'var(--bg-white)',
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={imgRef}
+          src={displaySrc}
+          alt={alt}
+          loading="lazy"
+          className={`w-full h-full object-contain transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${isTouchDevice ? 'cursor-pointer' : 'cursor-crosshair'}`}
+          onLoad={() => {
+            setIsLoaded(true);
+            if (imgRef.current) {
+              const rect = imgRef.current.getBoundingClientRect();
+              setImageDimensions({ width: rect.width, height: rect.height });
+            }
           }}
         />
-      )}
 
-      {/* Zoom hint */}
-      {isLoaded && !showMagnifier && (
-        <div className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2 py-1 rounded text-xs" style={{ background: 'rgba(0,0,0,0.6)', color: 'white' }}>
-          <ZoomIn className="w-3 h-3" />
-          {fullImageLoaded ? 'Hover to zoom' : 'Loading HD...'}
-        </div>
-      )}
-    </div>
+        {/* Desktop: Magnifier lens - uses full resolution image */}
+        {!isTouchDevice && showMagnifier && fullImageLoaded && (
+          <div
+            className="absolute pointer-events-none rounded-full overflow-hidden"
+            style={{
+              width: magnifierSize,
+              height: magnifierSize,
+              left: cursorPosition.x - magnifierSize / 2,
+              top: cursorPosition.y - magnifierSize / 2,
+              border: '4px solid white',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              backgroundImage: `url(${magnifierSrc})`,
+              backgroundSize: getMagnifierBackgroundSize(),
+              backgroundPosition: `${-magnifierPosition.x * imageDimensions.width * zoomLevel / 100 + magnifierSize / 2}px ${-magnifierPosition.y * imageDimensions.height * zoomLevel / 100 + magnifierSize / 2}px`,
+              backgroundRepeat: 'no-repeat',
+              backgroundColor: 'var(--bg-white)',
+            }}
+          />
+        )}
+
+        {/* Action buttons */}
+        {isLoaded && !showMagnifier && (
+          <div className="absolute bottom-3 right-3 flex items-center gap-2">
+            {/* HD View button - desktop only */}
+            {!isTouchDevice && fullImageLoaded && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowFullscreen(true);
+                }}
+                className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-white/90"
+                style={{ background: 'rgba(255,255,255,0.8)', color: '#333' }}
+              >
+                <Maximize2 className="w-3 h-3" />
+                HD
+              </button>
+            )}
+            {/* Zoom hint */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs" style={{ background: 'rgba(0,0,0,0.6)', color: 'white' }}>
+              <ZoomIn className="w-3 h-3" />
+              {isTouchDevice
+                ? 'Tap to view'
+                : fullImageLoaded ? 'Hover to zoom' : 'Loading HD...'}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Fullscreen viewer - works for both mobile and desktop */}
+      <FullscreenImageViewer
+        src={src}
+        alt={alt}
+        isOpen={showFullscreen}
+        onClose={() => setShowFullscreen(false)}
+      />
+    </>
   );
 }
 
@@ -430,6 +503,12 @@ export default function TranslationEditor({
 
   const [copiedTranslation, setCopiedTranslation] = useState(false);
   const [showOcrInRead, setShowOcrInRead] = useState(false);
+
+  // Swipe navigation state
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
 
   const previousPage = currentIndex > 0 ? pages[currentIndex - 1] : null;
   const nextPage = currentIndex < pages.length - 1 ? pages[currentIndex + 1] : null;
@@ -470,6 +549,50 @@ export default function TranslationEditor({
       prefetchImage(getSmallImageUrl(nextPage));
     }
   }, [previousPage, nextPage]);
+
+  // Swipe navigation handlers (mobile only)
+  const SWIPE_THRESHOLD = 50;
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Don't track if touching a scrollable area or interactive element
+    const target = e.target as HTMLElement;
+    if (target.closest('textarea, input, button, a, [data-no-swipe]')) return;
+
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === 0) return;
+
+    const deltaX = e.touches[0].clientX - touchStartX.current;
+    const deltaY = e.touches[0].clientY - touchStartY.current;
+
+    // Only track horizontal swipes (ignore vertical scrolling)
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+      setIsSwiping(true);
+      // Clamp the offset for visual feedback
+      const maxOffset = 100;
+      setSwipeOffset(Math.max(-maxOffset, Math.min(maxOffset, deltaX * 0.5)));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    const deltaX = swipeOffset * 2; // Reverse the 0.5 multiplier
+
+    if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+      if (deltaX > 0 && previousPage) {
+        onNavigate(previousPage.id);
+      } else if (deltaX < 0 && nextPage) {
+        onNavigate(nextPage.id);
+      }
+    }
+
+    // Reset swipe state
+    touchStartX.current = 0;
+    touchStartY.current = 0;
+    setSwipeOffset(0);
+    setIsSwiping(false);
+  };
 
   const handleSplitPage = async (side: 'left' | 'right') => {
     if (splitting) return;
@@ -577,8 +700,9 @@ export default function TranslationEditor({
   // READ MODE - Clean reading experience
   if (mode === 'read') {
     // Image column is narrow, text columns take the rest
-    const imageWidth = 'md:w-1/4';
-    const textWidth = showOcrInRead ? 'md:w-[37.5%]' : 'md:w-3/4';
+    // Use lg: (1024px) breakpoint so tablets stay in stacked view
+    const imageWidth = 'lg:w-1/4';
+    const textWidth = showOcrInRead ? 'lg:w-[37.5%]' : 'lg:w-3/4';
 
     return (
       <div className="h-screen flex flex-col" style={{ background: 'var(--bg-cream)' }}>
@@ -597,24 +721,24 @@ export default function TranslationEditor({
           </div>
 
           {/* Center: Page Navigation */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             <button
               onClick={() => previousPage && onNavigate(previousPage.id)}
               disabled={!previousPage}
-              className="p-2 rounded-lg hover:bg-stone-100 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+              className="p-2.5 sm:p-2 rounded-lg hover:bg-stone-100 transition-all disabled:opacity-30 disabled:hover:bg-transparent min-w-[44px] min-h-[44px] flex items-center justify-center"
               style={{ color: 'var(--text-secondary)' }}
               title="Previous page (←)"
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
-            <div className="flex items-center gap-2 px-3">
-              <span className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{currentIndex + 1}</span>
-              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>of {pages.length}</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3">
+              <span className="text-base sm:text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{currentIndex + 1}</span>
+              <span className="text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>of {pages.length}</span>
             </div>
             <button
               onClick={() => nextPage && onNavigate(nextPage.id)}
               disabled={!nextPage}
-              className="p-2 rounded-lg hover:bg-stone-100 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+              className="p-2.5 sm:p-2 rounded-lg hover:bg-stone-100 transition-all disabled:opacity-30 disabled:hover:bg-transparent min-w-[44px] min-h-[44px] flex items-center justify-center"
               style={{ color: 'var(--text-secondary)' }}
               title="Next page (→)"
             >
@@ -623,12 +747,12 @@ export default function TranslationEditor({
           </div>
 
           {/* Right: View Options + Edit */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* Show OCR Toggle */}
             {ocrText && (
               <button
                 onClick={() => setShowOcrInRead(!showOcrInRead)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${showOcrInRead ? 'bg-amber-100 text-amber-700' : 'hover:bg-stone-100'}`}
+                className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-md text-sm font-medium transition-all min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 ${showOcrInRead ? 'bg-amber-100 text-amber-700' : 'hover:bg-stone-100'}`}
                 style={{ color: showOcrInRead ? undefined : 'var(--text-muted)' }}
                 title="Show original text"
               >
@@ -639,7 +763,7 @@ export default function TranslationEditor({
             {/* Edit Button */}
             <button
               onClick={() => setMode('edit')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-stone-100 transition-all"
+              className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-md text-sm font-medium hover:bg-stone-100 transition-all min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
               style={{ color: 'var(--text-muted)' }}
             >
               <Pencil className="w-4 h-4" />
@@ -648,8 +772,17 @@ export default function TranslationEditor({
           </div>
         </header>
 
-        {/* Reading layout */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* Reading layout - with swipe navigation on mobile */}
+        <div
+          className="flex-1 flex flex-col lg:flex-row overflow-hidden relative"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{
+            transform: isSwiping ? `translateX(${swipeOffset}px)` : 'none',
+            transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
+          }}
+        >
           {/* Source Image */}
           <div className={`w-full ${imageWidth} flex flex-col`} style={{ background: 'var(--bg-warm)', borderRight: '1px solid var(--border-light)' }}>
             <div className="px-4 py-2 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -734,9 +867,10 @@ export default function TranslationEditor({
           </div>
         </div>
 
-        {/* Keyboard hint */}
-        <div className="px-4 py-1.5 text-center text-xs hidden md:block" style={{ background: 'var(--bg-warm)', color: 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
-          Use ← → arrow keys to navigate pages
+        {/* Navigation hint - different for mobile vs desktop */}
+        <div className="px-4 py-1.5 text-center text-xs" style={{ background: 'var(--bg-warm)', color: 'var(--text-muted)', borderTop: '1px solid var(--border-light)' }}>
+          <span className="hidden lg:inline">Use ← → arrow keys to navigate pages</span>
+          <span className="lg:hidden">Swipe left/right to navigate pages</span>
         </div>
       </div>
     );
@@ -812,10 +946,10 @@ export default function TranslationEditor({
         </div>
       </header>
 
-      {/* Main Content - Three Columns (stacked on mobile) */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      {/* Main Content - Three Columns (stacked on tablets/mobile, columns on desktop) */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Source Image Panel */}
-        <div className="w-full md:w-1/3 flex flex-col" style={{ background: 'var(--bg-cream)', borderRight: '1px solid var(--border-light)' }}>
+        <div className="w-full lg:w-1/3 flex flex-col" style={{ background: 'var(--bg-cream)', borderRight: '1px solid var(--border-light)' }}>
           <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-2">
               <span className="label">Source</span>
@@ -885,7 +1019,7 @@ export default function TranslationEditor({
         </div>
 
         {/* OCR Panel */}
-        <div className="w-full md:w-1/3 flex flex-col" style={{ background: 'var(--bg-white)', borderRight: '1px solid var(--border-light)' }}>
+        <div className="w-full lg:w-1/3 flex flex-col" style={{ background: 'var(--bg-white)', borderRight: '1px solid var(--border-light)' }}>
           <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-3">
               <button
@@ -928,7 +1062,7 @@ export default function TranslationEditor({
         </div>
 
         {/* Translation Panel */}
-        <div className="w-full md:w-1/3 flex flex-col" style={{ background: 'var(--bg-white)' }}>
+        <div className="w-full lg:w-1/3 flex flex-col" style={{ background: 'var(--bg-white)' }}>
           <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-3">
               <button

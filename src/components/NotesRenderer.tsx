@@ -3,74 +3,34 @@
 import { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
 interface NotesRendererProps {
   text: string;
   className?: string;
 }
 
-interface ParsedSegment {
-  type: 'text' | 'note' | 'page_number';
-  content: string;
-  noteIndex?: number;
-}
-
-interface ParseResult {
-  segments: ParsedSegment[];
-  footnotes: string[];
-}
-
-function parseTextWithNotes(text: string): ParseResult {
-  const segments: ParsedSegment[] = [];
+// Convert [[notes:...]] to numbered superscripts and collect footnotes
+function processNotesForMarkdown(text: string): { processedText: string; footnotes: string[] } {
   const footnotes: string[] = [];
-  const pattern = /\[\[(notes?|page\s*number):\s*(.*?)\]\]/gi;
 
-  let lastIndex = 0;
-  let match;
+  // Replace [[notes:...]] with superscript markers
+  // We use a special format that won't be parsed as markdown: ^[n]^
+  const processedText = text.replace(/\[\[(notes?):\s*(.*?)\]\]/gi, (match, type, content) => {
+    footnotes.push(content.trim());
+    return `<sup class="note-ref">${footnotes.length}</sup>`;
+  });
 
-  while ((match = pattern.exec(text)) !== null) {
-    // Add text before this match
-    if (match.index > lastIndex) {
-      segments.push({
-        type: 'text',
-        content: text.slice(lastIndex, match.index)
-      });
-    }
+  // Replace [[page number:...]] with styled page markers
+  const finalText = processedText.replace(/\[\[page\s*number:\s*(.*?)\]\]/gi, (match, pageNum) => {
+    return `<span class="page-marker">Page ${pageNum.trim()}</span>`;
+  });
 
-    // Add the note/page number
-    const type = match[1].toLowerCase().includes('page') ? 'page_number' : 'note';
-    const content = match[2].trim();
-
-    if (type === 'note') {
-      footnotes.push(content);
-      segments.push({
-        type,
-        content,
-        noteIndex: footnotes.length
-      });
-    } else {
-      segments.push({
-        type,
-        content
-      });
-    }
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Add remaining text
-  if (lastIndex < text.length) {
-    segments.push({
-      type: 'text',
-      content: text.slice(lastIndex)
-    });
-  }
-
-  return { segments, footnotes };
+  return { processedText: finalText, footnotes };
 }
 
 export default function NotesRenderer({ text, className = '' }: NotesRendererProps) {
-  const { segments, footnotes } = useMemo(() => parseTextWithNotes(text), [text]);
+  const { processedText, footnotes } = useMemo(() => processNotesForMarkdown(text), [text]);
 
   if (!text) {
     return (
@@ -82,78 +42,98 @@ export default function NotesRenderer({ text, className = '' }: NotesRendererPro
 
   return (
     <div className={`prose-manuscript ${className}`}>
-      {/* Main text with superscript note references */}
-      <div>
-        {segments.map((segment, index) => {
-          if (segment.type === 'note' && segment.noteIndex) {
-            return (
-              <sup
-                key={index}
-                className="text-amber-700 cursor-help font-medium ml-0.5"
-                title={segment.content}
-              >
-                {segment.noteIndex}
-              </sup>
-            );
-          }
-
-          if (segment.type === 'page_number') {
-            return (
-              <span key={index} className="note-page-number">
-                Page {segment.content}
-              </span>
-            );
-          }
-
-          // Regular text - render with markdown
-          return (
-            <ReactMarkdown
-              key={index}
-              remarkPlugins={[remarkGfm]}
-              components={{
-                // Use div for paragraphs to support block elements like tables
-                p: ({ children }) => <div className="whitespace-pre-wrap mb-4 last:mb-0">{children}</div>,
-                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                em: ({ children }) => <em className="italic">{children}</em>,
-                h1: ({ children }) => <h1 className="text-2xl font-serif font-bold mt-4 mb-2">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-xl font-serif font-bold mt-3 mb-2">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-lg font-serif font-semibold mt-2 mb-1">{children}</h3>,
-                ul: ({ children }) => <ul className="list-disc ml-5 my-2">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal ml-5 my-2">{children}</ol>,
-                li: ({ children }) => <li className="my-0.5">{children}</li>,
-                blockquote: ({ children }) => (
-                  <blockquote className="border-l-2 border-amber-300 pl-3 my-2 italic text-stone-600">
-                    {children}
-                  </blockquote>
-                ),
-                code: ({ children }) => (
-                  <code className="bg-stone-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>
-                ),
-                hr: () => <hr className="my-4 border-stone-200" />,
-                // Table support
-                table: ({ children }) => (
-                  <div className="overflow-x-auto my-4">
-                    <table className="min-w-full border-collapse border border-stone-200">{children}</table>
-                  </div>
-                ),
-                thead: ({ children }) => <thead className="bg-stone-100">{children}</thead>,
-                tbody: ({ children }) => <tbody>{children}</tbody>,
-                tr: ({ children }) => <tr className="border-b border-stone-200">{children}</tr>,
-                th: ({ children }) => (
-                  <th className="px-3 py-2 text-left text-sm font-semibold text-stone-700 border border-stone-200">
-                    {children}
-                  </th>
-                ),
-                td: ({ children }) => (
-                  <td className="px-3 py-2 text-sm text-stone-600 border border-stone-200">{children}</td>
-                ),
-              }}
-            >
-              {segment.content}
-            </ReactMarkdown>
-          );
-        })}
-      </div>
+      {/* Main text rendered as single markdown block */}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
+        allowedElements={[
+          'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'ul', 'ol', 'li', 'blockquote', 'code', 'pre',
+          'em', 'strong', 'del', 'hr', 'br', 'a',
+          'table', 'thead', 'tbody', 'tr', 'th', 'td',
+          'sup', 'span'
+        ]}
+        unwrapDisallowed={true}
+        components={{
+          p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+          h1: ({ children }) => (
+            <h1 className="text-2xl font-serif font-bold mt-6 mb-3 text-[var(--text-primary)]">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-xl font-serif font-bold mt-5 mb-2 text-[var(--text-primary)]">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-lg font-serif font-semibold mt-4 mb-2 text-[var(--text-primary)]">{children}</h3>
+          ),
+          h4: ({ children }) => (
+            <h4 className="text-base font-serif font-semibold mt-3 mb-1 text-[var(--text-primary)]">{children}</h4>
+          ),
+          ul: ({ children }) => <ul className="list-disc ml-5 my-3 space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal ml-5 my-3 space-y-1">{children}</ol>,
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-3 border-amber-300 pl-4 my-4 italic text-stone-600 bg-amber-50/30 py-2 pr-2 rounded-r">
+              {children}
+            </blockquote>
+          ),
+          code: ({ children }) => (
+            <code className="bg-stone-100 px-1.5 py-0.5 rounded text-sm font-mono text-stone-700">{children}</code>
+          ),
+          pre: ({ children }) => (
+            <pre className="bg-stone-100 p-3 rounded-lg overflow-x-auto my-3 text-sm">{children}</pre>
+          ),
+          hr: () => <hr className="my-6 border-stone-200" />,
+          a: ({ href, children }) => (
+            <a href={href} className="text-amber-700 underline hover:text-amber-800" target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          ),
+          // Table support
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-4">
+              <table className="min-w-full border-collapse border border-stone-200">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="bg-stone-100">{children}</thead>,
+          tbody: ({ children }) => <tbody>{children}</tbody>,
+          tr: ({ children }) => <tr className="border-b border-stone-200">{children}</tr>,
+          th: ({ children }) => (
+            <th className="px-3 py-2 text-left text-sm font-semibold text-stone-700 border border-stone-200">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="px-3 py-2 text-sm text-stone-600 border border-stone-200">{children}</td>
+          ),
+          // Custom elements for notes
+          sup: ({ children, className }) => {
+            if (className === 'note-ref') {
+              const noteIndex = parseInt(String(children), 10);
+              const noteContent = footnotes[noteIndex - 1] || '';
+              return (
+                <sup className="text-amber-700 cursor-help font-medium ml-0.5" title={noteContent}>
+                  {children}
+                </sup>
+              );
+            }
+            return <sup>{children}</sup>;
+          },
+          span: ({ children, className }) => {
+            if (className === 'page-marker') {
+              return (
+                <span className="inline-block bg-stone-100 text-stone-500 text-xs px-2 py-0.5 rounded font-medium my-1">
+                  {children}
+                </span>
+              );
+            }
+            return <span>{children}</span>;
+          },
+        }}
+      >
+        {processedText}
+      </ReactMarkdown>
 
       {/* Footnotes section */}
       {footnotes.length > 0 && (

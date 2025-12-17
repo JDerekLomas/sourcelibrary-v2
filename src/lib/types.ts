@@ -1,3 +1,12 @@
+export type BookStatus = 'draft' | 'in_progress' | 'complete' | 'published';
+
+export interface BookSummary {
+  data: string;
+  generated_at: Date;
+  page_coverage: number; // Percentage of pages included in summary (0-100)
+  model?: string;
+}
+
 export interface Book {
   id: string;
   _id?: string;
@@ -12,6 +21,12 @@ export interface Book {
   pages_count?: number;
   created_at?: Date;
   updated_at?: Date;
+
+  // Future fields for publication workflow
+  status?: BookStatus;
+  summary?: BookSummary;
+  doi?: string; // Digital Object Identifier (e.g., "10.5281/zenodo.12345")
+  license?: string; // e.g., "CC-BY-4.0"
 }
 
 export interface OcrData {

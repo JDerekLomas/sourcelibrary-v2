@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Book, Page } from '@/lib/types';
 import { ArrowLeft, BookOpen, Calendar, Globe, FileText, CheckCircle } from 'lucide-react';
 import SearchPanel from '@/components/SearchPanel';
+import DownloadButton from '@/components/DownloadButton';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -53,36 +54,36 @@ export default async function BookDetailPage({ params }: PageProps) {
 
       {/* Book Info */}
       <div className="bg-gradient-to-b from-stone-800 to-stone-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+          <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
             {/* Thumbnail */}
-            <div className="flex-shrink-0">
-              <div className="w-48 aspect-[3/4] relative rounded-lg overflow-hidden shadow-xl bg-stone-700">
+            <div className="flex-shrink-0 flex justify-center sm:justify-start">
+              <div className="w-32 sm:w-48 aspect-[3/4] relative rounded-lg overflow-hidden shadow-xl bg-stone-700">
                 {book.thumbnail ? (
                   <Image
                     src={book.thumbnail}
                     alt={book.title}
                     fill
                     className="object-cover"
-                    sizes="192px"
+                    sizes="(max-width: 640px) 128px, 192px"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <BookOpen className="w-16 h-16 text-stone-500" />
+                    <BookOpen className="w-12 sm:w-16 h-12 sm:h-16 text-stone-500" />
                   </div>
                 )}
               </div>
             </div>
 
             {/* Details */}
-            <div className="flex-1">
-              <h1 className="text-3xl font-serif font-bold">{book.display_title || book.title}</h1>
+            <div className="flex-1 text-center sm:text-left">
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold">{book.display_title || book.title}</h1>
               {book.display_title && book.title !== book.display_title && (
-                <p className="text-stone-400 mt-1 italic">{book.title}</p>
+                <p className="text-stone-400 mt-1 italic text-sm sm:text-base">{book.title}</p>
               )}
-              <p className="text-xl text-stone-300 mt-2">{book.author}</p>
+              <p className="text-lg sm:text-xl text-stone-300 mt-2">{book.author}</p>
 
-              <div className="flex items-center gap-6 mt-6 text-sm text-stone-400">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-6 mt-4 sm:mt-6 text-sm text-stone-400">
                 {book.language && (
                   <div className="flex items-center gap-2">
                     <Globe className="w-4 h-4" />
@@ -102,19 +103,28 @@ export default async function BookDetailPage({ params }: PageProps) {
                 <SearchPanel bookId={book.id} />
               </div>
 
-              {/* Processing Stats */}
-              <div className="flex gap-6 mt-6">
-                <div className="bg-stone-700/50 rounded-lg px-4 py-3">
-                  <div className="text-2xl font-bold text-amber-400">{pagesWithOcr}</div>
-                  <div className="text-xs text-stone-400">OCR Complete</div>
+              {/* Processing Stats + Download */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-6 mt-4 sm:mt-6">
+                <div className="bg-stone-700/50 rounded-lg px-3 sm:px-4 py-2 sm:py-3">
+                  <div className="text-xl sm:text-2xl font-bold text-amber-400">{pagesWithOcr}</div>
+                  <div className="text-xs text-stone-400">OCR</div>
                 </div>
-                <div className="bg-stone-700/50 rounded-lg px-4 py-3">
-                  <div className="text-2xl font-bold text-amber-400">{pagesWithTranslation}</div>
+                <div className="bg-stone-700/50 rounded-lg px-3 sm:px-4 py-2 sm:py-3">
+                  <div className="text-xl sm:text-2xl font-bold text-amber-400">{pagesWithTranslation}</div>
                   <div className="text-xs text-stone-400">Translated</div>
                 </div>
-                <div className="bg-stone-700/50 rounded-lg px-4 py-3">
-                  <div className="text-2xl font-bold text-amber-400">{pagesWithSummary}</div>
+                <div className="bg-stone-700/50 rounded-lg px-3 sm:px-4 py-2 sm:py-3">
+                  <div className="text-xl sm:text-2xl font-bold text-amber-400">{pagesWithSummary}</div>
                   <div className="text-xs text-stone-400">Summarized</div>
+                </div>
+
+                {/* Download Button */}
+                <div className="w-full sm:w-auto sm:ml-auto mt-2 sm:mt-0 flex justify-center sm:justify-end">
+                  <DownloadButton
+                    bookId={book.id}
+                    hasTranslations={pagesWithTranslation > 0}
+                    hasOcr={pagesWithOcr > 0}
+                  />
                 </div>
               </div>
             </div>
@@ -133,7 +143,7 @@ export default async function BookDetailPage({ params }: PageProps) {
             <p className="text-stone-500 mt-2">Upload pages to start processing.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 sm:gap-4">
             {pages.map((page) => {
               const hasOcr = !!page.ocr?.data;
               const hasTranslation = !!page.translation?.data;
