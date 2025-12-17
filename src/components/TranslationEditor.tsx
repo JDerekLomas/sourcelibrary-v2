@@ -389,8 +389,8 @@ export default function TranslationEditor({
   const [showSplitOptions, setShowSplitOptions] = useState(false);
   const [splitting, setSplitting] = useState(false);
 
-  const [selectedOcrPromptId, setSelectedOcrPromptId] = useState<string | null>(null);
-  const [selectedTranslationPromptId, setSelectedTranslationPromptId] = useState<string | null>(null);
+  const [selectedOcrPrompt, setSelectedOcrPrompt] = useState<Prompt | null>(null);
+  const [selectedTranslationPrompt, setSelectedTranslationPrompt] = useState<Prompt | null>(null);
 
   const [copiedTranslation, setCopiedTranslation] = useState(false);
   const [showOcrInRead, setShowOcrInRead] = useState(false);
@@ -454,6 +454,15 @@ export default function TranslationEditor({
   const handleProcess = async (action: 'ocr' | 'translation' | 'summary' | 'all') => {
     setProcessing(action);
     try {
+      // Build custom prompts object if any are selected
+      const customPrompts: { ocr?: string; translation?: string } = {};
+      if (selectedOcrPrompt?.content) {
+        customPrompts.ocr = selectedOcrPrompt.content;
+      }
+      if (selectedTranslationPrompt?.content) {
+        customPrompts.translation = selectedTranslationPrompt.content;
+      }
+
       const response = await fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -466,6 +475,7 @@ export default function TranslationEditor({
           ocrText: action === 'translation' ? ocrText : undefined,
           translatedText: action === 'summary' ? translationText : undefined,
           previousPageId: previousPage?.id,
+          customPrompts: Object.keys(customPrompts).length > 0 ? customPrompts : undefined,
           autoSave: true
         })
       });
@@ -911,8 +921,8 @@ export default function TranslationEditor({
         onClose={() => setShowOcrSettings(false)}
         title="OCR Settings"
         promptType="ocr"
-        selectedPromptId={selectedOcrPromptId}
-        onSelectPrompt={(prompt) => setSelectedOcrPromptId(prompt.id || prompt._id?.toString() || null)}
+        selectedPromptId={selectedOcrPrompt?.id || selectedOcrPrompt?._id?.toString() || null}
+        onSelectPrompt={setSelectedOcrPrompt}
       />
 
       <SettingsModal
@@ -920,8 +930,8 @@ export default function TranslationEditor({
         onClose={() => setShowTranslationSettings(false)}
         title="Translation Settings"
         promptType="translation"
-        selectedPromptId={selectedTranslationPromptId}
-        onSelectPrompt={(prompt) => setSelectedTranslationPromptId(prompt.id || prompt._id?.toString() || null)}
+        selectedPromptId={selectedTranslationPrompt?.id || selectedTranslationPrompt?._id?.toString() || null}
+        onSelectPrompt={setSelectedTranslationPrompt}
       />
     </div>
   );
