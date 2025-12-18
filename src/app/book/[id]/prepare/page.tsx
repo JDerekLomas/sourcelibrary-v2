@@ -14,7 +14,8 @@ import {
   ChevronUp,
   ChevronDown,
   Wand2,
-  RefreshCw
+  RefreshCw,
+  GripVertical
 } from 'lucide-react';
 import type { Book, Page } from '@/lib/types';
 
@@ -39,6 +40,9 @@ export default function PreparePage({ params }: PageProps) {
   const [detectionResults, setDetectionResults] = useState<Record<string, SplitDetection>>({});
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
   const [applying, setApplying] = useState(false);
+  const [draggedPageId, setDraggedPageId] = useState<string | null>(null);
+  const [dragOverPageId, setDragOverPageId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   useEffect(() => {
     params.then(({ id }) => setBookId(id));
@@ -178,6 +182,72 @@ export default function PreparePage({ params }: PageProps) {
     }
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (pageId: string) => {
+    setDraggedPageId(pageId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPageId(null);
+    setDragOverPageId(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, pageId: string) => {
+    e.preventDefault();
+    if (draggedPageId && draggedPageId !== pageId) {
+      setDragOverPageId(pageId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverPageId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetPageId: string) => {
+    e.preventDefault();
+    if (!draggedPageId || draggedPageId === targetPageId) {
+      setDraggedPageId(null);
+      setDragOverPageId(null);
+      return;
+    }
+
+    // Reorder pages locally first
+    const draggedIndex = pages.findIndex(p => p.id === draggedPageId);
+    const targetIndex = pages.findIndex(p => p.id === targetPageId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newPages = [...pages];
+    const [draggedPage] = newPages.splice(draggedIndex, 1);
+    newPages.splice(targetIndex, 0, draggedPage);
+
+    // Update local state immediately for responsiveness
+    setPages(newPages);
+    setDraggedPageId(null);
+    setDragOverPageId(null);
+
+    // Save to server
+    setReordering(true);
+    try {
+      const pageOrder = newPages.map(p => p.id);
+      const res = await fetch(`/api/books/${bookId}/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageOrder })
+      });
+
+      if (!res.ok) {
+        // Revert on error
+        await fetchBook();
+      }
+    } catch (error) {
+      console.error('Reorder error:', error);
+      await fetchBook();
+    } finally {
+      setReordering(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-stone-50">
@@ -281,15 +351,32 @@ export default function PreparePage({ params }: PageProps) {
             const detection = detectionResults[page.id];
             const isSelected = selectedPages.has(page.id);
             const isDetecting = detecting === page.id;
+            const isDragging = draggedPageId === page.id;
+            const isDragOver = dragOverPageId === page.id;
 
             return (
               <div
                 key={page.id}
-                className={`bg-white rounded-lg border ${isSelected ? 'border-amber-400 ring-2 ring-amber-100' : 'border-stone-200'} overflow-hidden`}
+                draggable
+                onDragStart={() => handleDragStart(page.id)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, page.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, page.id)}
+                className={`bg-white rounded-lg border transition-all ${
+                  isDragging ? 'opacity-50 scale-[0.98]' :
+                  isDragOver ? 'border-amber-400 ring-2 ring-amber-200 translate-y-1' :
+                  isSelected ? 'border-amber-400 ring-2 ring-amber-100' : 'border-stone-200'
+                } overflow-hidden`}
               >
                 <div className="flex items-stretch">
+                  {/* Drag Handle */}
+                  <div className="flex items-center px-2 cursor-grab active:cursor-grabbing text-stone-300 hover:text-stone-500">
+                    <GripVertical className="w-5 h-5" />
+                  </div>
+
                   {/* Checkbox */}
-                  <div className="flex items-center px-4 border-r border-stone-100">
+                  <div className="flex items-center px-3 border-r border-stone-100">
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -300,8 +387,8 @@ export default function PreparePage({ params }: PageProps) {
                   </div>
 
                   {/* Page Number */}
-                  <div className="flex items-center justify-center w-16 bg-stone-50 text-stone-500 font-medium">
-                    {page.page_number}
+                  <div className="flex items-center justify-center w-12 bg-stone-50 text-stone-500 font-medium text-sm">
+                    {index + 1}
                   </div>
 
                   {/* Image Preview */}

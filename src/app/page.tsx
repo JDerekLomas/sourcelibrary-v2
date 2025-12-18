@@ -162,6 +162,17 @@ export default async function HomePage() {
                   List
                 </button>
               </div>
+
+              {/* Add Book Button */}
+              <Link
+                href="/upload"
+                className="flex items-center gap-2 px-5 py-3 bg-amber-600 text-white rounded-full text-sm font-medium hover:bg-amber-700 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Book
+              </Link>
             </div>
           </div>
 

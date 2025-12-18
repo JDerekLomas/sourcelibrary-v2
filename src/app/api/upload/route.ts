@@ -1,0 +1,116 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
+import { ObjectId } from 'mongodb';
+import { getDb } from '@/lib/mongodb';
+
+// Maximum file size: 20MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData();
+    const bookId = formData.get('bookId') as string;
+    const files = formData.getAll('files') as File[];
+
+    if (!bookId) {
+      return NextResponse.json({ error: 'Book ID is required' }, { status: 400 });
+    }
+
+    if (!files || files.length === 0) {
+      return NextResponse.json({ error: 'No files provided' }, { status: 400 });
+    }
+
+    // Verify book exists
+    const db = await getDb();
+    const book = await db.collection('books').findOne({ id: bookId });
+    if (!book) {
+      return NextResponse.json({ error: 'Book not found' }, { status: 404 });
+    }
+
+    // Create upload directory
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', bookId);
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
+    }
+
+    // Get current max page number
+    const existingPages = await db.collection('pages')
+      .find({ book_id: bookId })
+      .sort({ page_number: -1 })
+      .limit(1)
+      .toArray();
+    let nextPageNumber = existingPages.length > 0 ? existingPages[0].page_number + 1 : 1;
+
+    const uploadedPages = [];
+
+    for (const file of files) {
+      // Validate file
+      if (!file.type.startsWith('image/')) {
+        continue; // Skip non-image files
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        continue; // Skip files that are too large
+      }
+
+      // Generate unique filename
+      const ext = path.extname(file.name) || '.jpg';
+      const filename = `${new ObjectId().toHexString()}${ext}`;
+      const filepath = path.join(uploadDir, filename);
+
+      // Write file to disk
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filepath, buffer);
+
+      // Create page record
+      const pageId = new ObjectId().toHexString();
+      const photoUrl = `/uploads/${bookId}/${filename}`;
+
+      const page = {
+        id: pageId,
+        tenant_id: 'default',
+        book_id: bookId,
+        page_number: nextPageNumber,
+        photo: photoUrl,
+        photo_original: photoUrl,
+        ocr: null,
+        translation: null,
+        summary: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      await db.collection('pages').insertOne(page);
+      uploadedPages.push(page);
+      nextPageNumber++;
+    }
+
+    // Update book thumbnail if this is the first page
+    if (uploadedPages.length > 0) {
+      const firstPage = await db.collection('pages')
+        .findOne({ book_id: bookId, page_number: 1 });
+
+      if (firstPage && !book.thumbnail) {
+        await db.collection('books').updateOne(
+          { id: bookId },
+          { $set: { thumbnail: firstPage.photo, updated_at: new Date() } }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      uploaded: uploadedPages.length,
+      pages: uploadedPages,
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Upload failed' },
+      { status: 500 }
+    );
+  }
+}
