@@ -145,21 +145,30 @@ export const DEFAULT_PROMPTS: ProcessingPrompts = {
 - ## headings for chapter/section titles
 - --- for decorative dividers or section breaks
 - ->centered text<- for centered lines (titles, headers)
+- | tables | for columnar data, lists, or parallel text
 - [[notes: ...]] for your observations about the text
-- [[margin: ...]] for marginalia written in the margins
+- [[margin: ...]] for text in the margins (glosses, additions, references)
+- [[gloss: ...]] for interlinear annotations above/below words
+- [[insert: ...]] for text in boxes, cartouches, or later additions
 - [[unclear: ...]] for illegible or uncertain readings
 - [[page number: N]] for visible page numbers
 
 **Do NOT use:**
 - Code blocks (\`\`\`) or inline code (\`backticks\`) - this is prose, not code
 - HTML tags - use markdown equivalents
-- Tables unless the original has actual tabular data
+
+**Handling page layout:**
+- Use tables for columnar layouts or parallel texts
+- Use [[margin: ...]] for marginal notes, even if extensive
+- Use [[insert: ...]] for boxed text, diagrams with labels, or later additions
+- Use [[gloss: ...]] for small annotations written between lines
+- Transcribe in reading order (usually top-to-bottom, left-to-right)
 
 **Instructions:**
-1. Begin with [[notes: ...]] summarizing image quality, layout, or issues.
+1. Begin with [[notes: ...]] summarizing image quality, layout, and any special features.
 2. Preserve original spelling, capitalization, and punctuation.
 3. Mark uncertain readings with [[unclear: possible reading]].
-4. Note marginalia with [[margin: text from margin]].
+4. Capture ALL text on the page, including margins, boxes, and annotations.
 
 **Language:** {language}`,
 
@@ -176,18 +185,21 @@ export const DEFAULT_PROMPTS: ProcessingPrompts = {
 - ## headings mirroring the original structure
 - --- for section breaks
 - ->centered text<- for centered lines
+- | tables | preserve columnar layouts from the original
 - [[notes: ...]] for translation notes, context, or alternate readings
+- [[margin: ...]] translate marginal notes, keeping them marked
+- [[insert: ...]] translate boxed or inserted text, keeping it marked
 
 **Do NOT use:**
 - Code blocks or backticks - this is prose, not code
-- Over-formatting - keep it readable
 
 **Instructions:**
 1. Start with [[notes: ...]] for context about this passage.
-2. Mirror the source layout (headings, paragraphs, centered text).
-3. Add [[notes: ...]] inline to explain historical references or difficult phrases.
-4. Style: warm and accessible, like a museum label - explain rather than assume knowledge.
-5. Preserve the voice and spirit of the original.
+2. Mirror the source layout (headings, paragraphs, tables, centered text).
+3. Translate ALL text including margins, boxes, and annotations - keep the markup.
+4. Add [[notes: ...]] inline to explain historical references or difficult phrases.
+5. Style: warm and accessible, like a museum label - explain rather than assume knowledge.
+6. Preserve the voice and spirit of the original.
 
 **Source language:** {source_language}
 **Target language:** {target_language}`,
