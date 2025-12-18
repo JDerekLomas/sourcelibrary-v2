@@ -60,6 +60,7 @@ export default function PreparePage({ params }: PageProps) {
   const [detectionResults, setDetectionResults] = useState<Record<string, SplitDetection>>({});
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [pagesToSplit, setPagesToSplit] = useState<Set<string>>(new Set());
   const [applying, setApplying] = useState(false);
   const [draggedPageId, setDraggedPageId] = useState<string | null>(null);
   const [dragOverPageId, setDragOverPageId] = useState<string | null>(null);
@@ -179,6 +180,18 @@ export default function PreparePage({ params }: PageProps) {
 
   const toggleExpanded = (pageId: string) => {
     setExpandedPages(prev => {
+      const next = new Set(prev);
+      if (next.has(pageId)) {
+        next.delete(pageId);
+      } else {
+        next.add(pageId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSplitMark = (pageId: string) => {
+    setPagesToSplit(prev => {
       const next = new Set(prev);
       if (next.has(pageId)) {
         next.delete(pageId);
@@ -390,24 +403,28 @@ export default function PreparePage({ params }: PageProps) {
     }
   };
 
-  const applySelectedSplits = async () => {
-    const splittablePages = Array.from(selectedPages).filter(id =>
-      detectionResults[id]?.isTwoPageSpread
-    );
-    if (splittablePages.length === 0) return;
+  const applyMarkedSplits = async () => {
+    if (pagesToSplit.size === 0) return;
 
     setApplying(true);
     try {
-      for (const pageId of splittablePages) {
-        const detection = detectionResults[pageId];
+      for (const pageId of pagesToSplit) {
+        // For manual splits, split at 50% (middle of page)
+        const manualDetection = {
+          isTwoPageSpread: true,
+          confidence: 'manual',
+          leftPage: { xmin: 0, xmax: 500, ymin: 0, ymax: 1000 },
+          rightPage: { xmin: 500, xmax: 1000, ymin: 0, ymax: 1000 }
+        };
         await fetch(`/api/pages/${pageId}/split`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ detection })
+          body: JSON.stringify({ detection: manualDetection })
         });
       }
       await fetchBook();
       setSelectedPages(new Set());
+      setPagesToSplit(new Set());
     } catch (error) {
       console.error('Apply error:', error);
     } finally {
@@ -424,6 +441,7 @@ export default function PreparePage({ params }: PageProps) {
       await fetchBook();
       setDetectionResults({});
       setSelectedPages(new Set());
+      setPagesToSplit(new Set());
     } catch (error) {
       console.error('Reset error:', error);
     } finally {
@@ -566,98 +584,109 @@ export default function PreparePage({ params }: PageProps) {
       {/* Action Bar */}
       <div className="bg-white border-b border-stone-200 sticky top-[105px] z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          {/* Selection actions */}
-          {selectedPages.size > 0 ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-amber-600">
-                  {selectedPages.size} selected
-                </span>
-                <button onClick={clearSelection} className="text-sm text-stone-500 hover:text-stone-700">
-                  Clear
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={runOcrOnSelected}
-                  disabled={processing.active}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <FileText className="w-4 h-4" />
-                  OCR
-                </button>
-                <button
-                  onClick={runTranslationOnSelected}
-                  disabled={processing.active}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  <Languages className="w-4 h-4" />
-                  Translate
-                </button>
-                <button
-                  onClick={runSummaryOnSelected}
-                  disabled={processing.active}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                >
-                  <BookOpen className="w-4 h-4" />
-                  Summarize
-                </button>
-                {pagesWithSplits.some(p => selectedPages.has(p.id)) && (
+          <div className="flex items-center justify-between">
+            {/* Left side - info and split action */}
+            <div className="flex items-center gap-4">
+              {pagesToSplit.size > 0 ? (
+                <>
+                  <span className="text-sm font-medium text-amber-600">
+                    {pagesToSplit.size} marked for split
+                  </span>
                   <button
-                    onClick={applySelectedSplits}
-                    disabled={applying}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                    onClick={() => setPagesToSplit(new Set())}
+                    className="text-sm text-stone-500 hover:text-stone-700"
                   >
-                    <Scissors className="w-4 h-4" />
-                    Split
+                    Clear
                   </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={selectAll}
-                  className="text-sm text-stone-600 hover:text-stone-900 px-2 py-1 hover:bg-stone-100 rounded"
-                >
-                  Select all
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                {pagesNeedingOcr.length > 0 && (
                   <button
-                    onClick={runOcrOnAll}
+                    onClick={applyMarkedSplits}
+                    disabled={applying}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
+                    Apply Splits
+                  </button>
+                </>
+              ) : (
+                <span className="text-sm text-stone-500">
+                  Click thumbnails to mark pages for splitting
+                </span>
+              )}
+            </div>
+
+            {/* Right side - process actions (only when pages selected via checkbox) */}
+            <div className="flex items-center gap-2">
+              {selectedPages.size > 0 ? (
+                <>
+                  <span className="text-sm text-stone-500 mr-2">{selectedPages.size} selected</span>
+                  <button
+                    onClick={runOcrOnSelected}
                     disabled={processing.active}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   >
                     <FileText className="w-4 h-4" />
-                    OCR All ({pagesNeedingOcr.length})
+                    OCR
                   </button>
-                )}
-                {pagesNeedingTranslation.length > 0 && (
                   <button
-                    onClick={runTranslationOnAll}
+                    onClick={runTranslationOnSelected}
                     disabled={processing.active}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm border border-green-200 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                   >
                     <Languages className="w-4 h-4" />
-                    Translate All ({pagesNeedingTranslation.length})
+                    Translate
                   </button>
-                )}
-                {pagesNeedingSummary.length > 0 && (
                   <button
-                    onClick={runSummaryOnAll}
+                    onClick={runSummaryOnSelected}
                     disabled={processing.active}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm border border-purple-200 text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
                   >
                     <BookOpen className="w-4 h-4" />
-                    Summarize All ({pagesNeedingSummary.length})
+                    Summarize
                   </button>
-                )}
-              </div>
+                  <button onClick={clearSelection} className="text-sm text-stone-500 hover:text-stone-700 ml-2">
+                    Clear
+                  </button>
+                </>
+              ) : (
+                /* Batch buttons - less prominent */
+                <div className="flex items-center gap-2 text-sm">
+                  {pagesNeedingOcr.length > 0 && (
+                    <button
+                      onClick={runOcrOnAll}
+                      disabled={processing.active}
+                      className="text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50"
+                    >
+                      OCR {pagesNeedingOcr.length} pages
+                    </button>
+                  )}
+                  {pagesNeedingTranslation.length > 0 && (
+                    <>
+                      <span className="text-stone-300">|</span>
+                      <button
+                        onClick={runTranslationOnAll}
+                        disabled={processing.active}
+                        className="text-green-600 hover:text-green-800 hover:underline disabled:opacity-50"
+                      >
+                        Translate {pagesNeedingTranslation.length}
+                      </button>
+                    </>
+                  )}
+                  {pagesNeedingSummary.length > 0 && (
+                    <>
+                      <span className="text-stone-300">|</span>
+                      <button
+                        onClick={runSummaryOnAll}
+                        disabled={processing.active}
+                        className="text-purple-600 hover:text-purple-800 hover:underline disabled:opacity-50"
+                      >
+                        Summarize {pagesNeedingSummary.length}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -772,6 +801,7 @@ export default function PreparePage({ params }: PageProps) {
             const isDragOver = dragOverPageId === page.id;
             const isSplitPage = !!page.split_from;
             const isProcessing = processing.currentPageId === page.id;
+            const markedForSplit = pagesToSplit.has(page.id);
 
             const hasOcr = !!page.ocr?.data;
             const hasTranslation = !!page.translation?.data;
@@ -809,15 +839,27 @@ export default function PreparePage({ params }: PageProps) {
                     className="w-4 h-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
                   />
 
-                  {/* Thumbnail - click to enlarge */}
+                  {/* Thumbnail - click to mark for split, double-click to enlarge */}
                   <button
                     onClick={() => {
+                      if (!isSplitPage) {
+                        toggleSplitMark(page.id);
+                      }
+                    }}
+                    onDoubleClick={() => {
                       const fullUrl = page.crop?.xStart !== undefined
                         ? `/api/image?url=${encodeURIComponent(page.photo_original || page.photo)}&w=1200&q=90&cx=${page.crop.xStart}&cw=${page.crop.xEnd}`
                         : page.photo_original || page.photo;
                       setFullscreenImage({ src: fullUrl, alt: `Page ${index + 1}` });
                     }}
-                    className="w-16 h-12 bg-stone-100 rounded overflow-hidden flex-shrink-0 hover:ring-2 hover:ring-amber-400 transition-all cursor-zoom-in"
+                    className={`w-16 h-12 rounded overflow-hidden flex-shrink-0 transition-all ${
+                      markedForSplit
+                        ? 'ring-2 ring-amber-500 bg-amber-100'
+                        : isSplitPage
+                          ? 'bg-purple-100'
+                          : 'bg-stone-100 hover:ring-2 hover:ring-stone-300'
+                    } ${!isSplitPage ? 'cursor-pointer' : ''}`}
+                    title={isSplitPage ? 'Already split' : markedForSplit ? 'Click to unmark' : 'Click to mark for split'}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -839,9 +881,9 @@ export default function PreparePage({ params }: PageProps) {
                           split
                         </span>
                       )}
-                      {detection?.isTwoPageSpread && (
-                        <span className="text-xs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded">
-                          spread
+                      {markedForSplit && (
+                        <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">
+                          ✂️ to split
                         </span>
                       )}
                       {isProcessing && (
