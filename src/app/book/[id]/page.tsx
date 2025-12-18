@@ -138,11 +138,13 @@ export default async function BookDetailPage({ params }: PageProps) {
           <div className="bg-white rounded-lg border border-stone-200 p-6">
             <h2 className="text-lg font-semibold text-stone-900 mb-4">About This Book</h2>
             <div className="prose prose-stone prose-sm max-w-none">
-              {book.summary.split('\n\n').map((paragraph: string, i: number) => (
-                <p key={i} className="text-stone-700 leading-relaxed mb-4 last:mb-0">
-                  {paragraph}
-                </p>
-              ))}
+              {(typeof book.summary === 'string' ? book.summary : book.summary.data)
+                .split('\n\n')
+                .map((paragraph: string, i: number) => (
+                  <p key={i} className="text-stone-700 leading-relaxed mb-4 last:mb-0">
+                    {paragraph}
+                  </p>
+                ))}
             </div>
           </div>
         </div>
