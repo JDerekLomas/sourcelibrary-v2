@@ -608,7 +608,7 @@ export default function PreparePage({ params }: PageProps) {
                 </>
               ) : (
                 <span className="text-sm text-stone-500">
-                  Click thumbnails to mark pages for splitting
+                  Click ✂️ to mark pages for splitting
                 </span>
               )}
             </div>
@@ -838,28 +838,22 @@ export default function PreparePage({ params }: PageProps) {
                     className="w-4 h-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
                   />
 
-                  {/* Thumbnail - click to mark for split, double-click to enlarge */}
+                  {/* Thumbnail - click to preview */}
                   <button
                     onClick={() => {
-                      if (!isSplitPage) {
-                        toggleSplitMark(page.id);
-                      }
-                    }}
-                    onDoubleClick={() => {
-                      // Use medium res for quick preview (not full res)
                       const previewUrl = page.crop?.xStart !== undefined
                         ? `/api/image?url=${encodeURIComponent(page.photo_original || page.photo)}&w=600&q=75&cx=${page.crop.xStart}&cw=${page.crop.xEnd}`
                         : `/api/image?url=${encodeURIComponent(page.photo_original || page.photo)}&w=600&q=75`;
                       setFullscreenImage({ src: previewUrl, alt: `Page ${index + 1}` });
                     }}
-                    className={`w-16 h-12 rounded overflow-hidden flex-shrink-0 transition-all ${
+                    className={`w-16 h-12 rounded overflow-hidden flex-shrink-0 transition-all cursor-zoom-in ${
                       markedForSplit
                         ? 'ring-2 ring-amber-500 bg-amber-100'
                         : isSplitPage
                           ? 'bg-purple-100'
                           : 'bg-stone-100 hover:ring-2 hover:ring-stone-300'
-                    } ${!isSplitPage ? 'cursor-pointer' : ''}`}
-                    title={isSplitPage ? 'Already split' : markedForSplit ? 'Click to unmark' : 'Click to mark for split'}
+                    }`}
+                    title="Click to preview"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -930,12 +924,15 @@ export default function PreparePage({ params }: PageProps) {
                   <div className="flex items-center gap-1">
                     {!isSplitPage && (
                       <button
-                        onClick={() => detectSplit(page.id)}
-                        disabled={isDetecting}
-                        className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded"
-                        title="Detect split"
+                        onClick={() => toggleSplitMark(page.id)}
+                        className={`p-1.5 rounded ${
+                          markedForSplit
+                            ? 'text-amber-600 bg-amber-100 hover:bg-amber-200'
+                            : 'text-stone-400 hover:text-amber-600 hover:bg-amber-50'
+                        }`}
+                        title={markedForSplit ? 'Unmark for split' : 'Mark for split'}
                       >
-                        <Wand2 className={`w-4 h-4 ${isDetecting ? 'animate-pulse' : ''}`} />
+                        <Scissors className="w-4 h-4" />
                       </button>
                     )}
                     <button
