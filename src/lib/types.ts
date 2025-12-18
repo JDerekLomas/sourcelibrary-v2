@@ -7,6 +7,27 @@ export interface BookSummary {
   model?: string;
 }
 
+// Dublin Core metadata for library interoperability
+// See: https://www.dublincore.org/specifications/dublin-core/dcmi-terms/
+export interface DublinCoreMetadata {
+  // dc:title - handled by Book.title / Book.display_title
+  // dc:creator - handled by Book.author
+  // dc:date - handled by Book.published
+  // dc:language - handled by Book.language
+
+  dc_subject?: string[];        // Topics, keywords, classification codes
+  dc_description?: string;      // Abstract or table of contents
+  dc_publisher?: string;        // Original publisher
+  dc_contributor?: string[];    // Other contributors (translators, editors)
+  dc_type?: string;             // e.g., "Text", "Manuscript", "Book"
+  dc_format?: string;           // Physical format, e.g., "24 cm, 120 pages"
+  dc_identifier?: string[];     // ISBN, OCLC number, catalog IDs
+  dc_source?: string;           // Physical location (library, archive, collection)
+  dc_relation?: string[];       // Related works, other editions
+  dc_coverage?: string;         // Geographic or temporal scope
+  dc_rights?: string;           // Rights statement (use license for standard licenses)
+}
+
 export interface Book {
   id: string;
   _id?: string;
@@ -22,11 +43,16 @@ export interface Book {
   created_at?: Date;
   updated_at?: Date;
 
-  // Future fields for publication workflow
+  // Workflow status
   status?: BookStatus;
-  summary?: BookSummary;
-  doi?: string; // Digital Object Identifier (e.g., "10.5281/zenodo.12345")
-  license?: string; // e.g., "CC-BY-4.0"
+  summary?: string | BookSummary;
+
+  // Standard identifiers
+  doi?: string;                 // Digital Object Identifier (e.g., "10.5281/zenodo.12345")
+  license?: string;             // SPDX identifier (e.g., "CC0-1.0", "CC-BY-4.0")
+
+  // Dublin Core metadata for library interoperability
+  dublin_core?: DublinCoreMetadata;
 }
 
 export interface OcrData {
@@ -50,6 +76,14 @@ export interface SummaryData {
   updated_at?: Date;
 }
 
+// Crop coordinates for split pages (0-1000 scale)
+export interface CropData {
+  xStart: number;
+  xEnd: number;
+  yStart?: number;
+  yEnd?: number;
+}
+
 export interface Page {
   id: string;
   _id?: string;
@@ -64,6 +98,19 @@ export interface Page {
   summary?: SummaryData;
   created_at?: Date;
   updated_at?: Date;
+
+  // Split/crop workflow
+  photo_original?: string;      // Original S3 URL before cropping
+  cropped_photo?: string;       // Local path to cropped image
+  crop?: CropData;              // Crop coordinates used
+  split_from?: string;          // ID of parent page if this was split from another
+  split_detection?: {           // AI detection result
+    isTwoPageSpread: boolean;
+    confidence: string;
+    reasoning?: string;
+    leftPage?: CropData;
+    rightPage?: CropData;
+  };
 }
 
 export interface ProcessingPrompts {

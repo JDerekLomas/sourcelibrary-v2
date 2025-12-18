@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
+import fs from 'fs';
+import path from 'path';
 
 // Cache resized images for 1 week
 const CACHE_DURATION = 60 * 60 * 24 * 7;
@@ -15,21 +17,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 });
     }
 
-    // Only allow S3 URLs for security
-    const allowedHosts = ['amazonaws.com'];
-    const urlObj = new URL(url);
-    if (!allowedHosts.some(host => urlObj.hostname.endsWith(host))) {
-      return NextResponse.json({ error: 'URL not allowed' }, { status: 403 });
-    }
+    let buffer: Buffer;
 
-    // Fetch the original image
-    const response = await fetch(url);
-    if (!response.ok) {
-      return NextResponse.json({ error: 'Failed to fetch image' }, { status: 502 });
-    }
+    // Handle local paths (starting with /)
+    if (url.startsWith('/')) {
+      const localPath = path.join(process.cwd(), 'public', url);
+      if (!fs.existsSync(localPath)) {
+        return NextResponse.json({ error: 'Local file not found' }, { status: 404 });
+      }
+      buffer = fs.readFileSync(localPath);
+    } else {
+      // Only allow S3 URLs for security
+      const allowedHosts = ['amazonaws.com'];
+      const urlObj = new URL(url);
+      if (!allowedHosts.some(host => urlObj.hostname.endsWith(host))) {
+        return NextResponse.json({ error: 'URL not allowed' }, { status: 403 });
+      }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+      // Fetch the original image
+      const response = await fetch(url);
+      if (!response.ok) {
+        return NextResponse.json({ error: 'Failed to fetch image' }, { status: 502 });
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    }
 
     // Resize with sharp
     const resized = await sharp(buffer)
