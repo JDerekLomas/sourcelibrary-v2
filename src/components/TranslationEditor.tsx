@@ -535,6 +535,19 @@ export default function TranslationEditor({
   const previousPage = currentIndex > 0 ? pages[currentIndex - 1] : null;
   const nextPage = currentIndex < pages.length - 1 ? pages[currentIndex + 1] : null;
 
+  // Build image URL with crop if available
+  const getImageUrl = (p: Page, forThumbnail = false) => {
+    const baseUrl = p.photo_original || p.photo;
+    if (!baseUrl) return '';
+    if (p.crop?.xStart !== undefined && p.crop?.xEnd !== undefined) {
+      const width = forThumbnail ? 400 : 1200;
+      return `/api/image?url=${encodeURIComponent(baseUrl)}&w=${width}&q=80&cx=${p.crop.xStart}&cw=${p.crop.xEnd}`;
+    }
+    return baseUrl;
+  };
+  const pageImageUrl = getImageUrl(page);
+  const pageThumbnailUrl = page.crop ? getImageUrl(page, true) : (page.thumbnail || page.compressed_photo);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -781,8 +794,8 @@ export default function TranslationEditor({
             </div>
             <div className="flex-1 overflow-hidden p-2 lg:p-4">
               <div className="relative w-full h-full rounded-lg overflow-hidden" style={{ background: 'var(--bg-white)', border: '1px solid var(--border-light)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                {page.photo ? (
-                  <ImageWithMagnifier src={page.photo} thumbnail={page.thumbnail || page.compressed_photo} alt={`Page ${page.page_number}`} />
+                {pageImageUrl ? (
+                  <ImageWithMagnifier src={pageImageUrl} thumbnail={pageThumbnailUrl} alt={`Page ${page.page_number}`} />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
                     No image available

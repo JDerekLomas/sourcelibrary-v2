@@ -73,3 +73,41 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to update page' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const db = await getDb();
+
+    // Check if page exists
+    const page = await db.collection('pages').findOne({ id });
+    if (!page) {
+      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+    }
+
+    // Delete the page
+    await db.collection('pages').deleteOne({ id });
+
+    // Renumber remaining pages for this book
+    const remainingPages = await db.collection('pages')
+      .find({ book_id: page.book_id })
+      .sort({ page_number: 1 })
+      .toArray();
+
+    // Update page numbers sequentially
+    for (let i = 0; i < remainingPages.length; i++) {
+      await db.collection('pages').updateOne(
+        { id: remainingPages[i].id },
+        { $set: { page_number: i + 1, updated_at: new Date() } }
+      );
+    }
+
+    return NextResponse.json({ success: true, deleted: id });
+  } catch (error) {
+    console.error('Error deleting page:', error);
+    return NextResponse.json({ error: 'Failed to delete page' }, { status: 500 });
+  }
+}

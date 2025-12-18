@@ -175,6 +175,17 @@ export default async function BookDetailPage({ params }: PageProps) {
               const hasSummary = !!page.summary?.data;
               const isComplete = hasOcr && hasTranslation && hasSummary;
 
+              // Build image URL with crop if available
+              const getImageUrl = () => {
+                const baseUrl = page.photo_original || page.photo;
+                if (!baseUrl) return null;
+                if (page.crop?.xStart !== undefined && page.crop?.xEnd !== undefined) {
+                  return `/api/image?url=${encodeURIComponent(baseUrl)}&w=200&q=70&cx=${page.crop.xStart}&cw=${page.crop.xEnd}`;
+                }
+                return page.thumbnail || `/api/image?url=${encodeURIComponent(baseUrl)}&w=200&q=70`;
+              };
+              const imageUrl = getImageUrl();
+
               return (
                 <Link
                   key={page.id}
@@ -182,13 +193,13 @@ export default async function BookDetailPage({ params }: PageProps) {
                   className="group relative"
                 >
                   <div className="aspect-[3/4] bg-white border border-stone-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-                    {page.thumbnail || page.photo ? (
-                      <Image
-                        src={page.thumbnail || page.photo}
+                    {imageUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={imageUrl}
                         alt={`Page ${page.page_number}`}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform"
-                        sizes="(max-width: 640px) 25vw, 12.5vw"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-stone-100">
