@@ -858,9 +858,13 @@ export default function PreparePage({ params }: PageProps) {
                       <div className="bg-white rounded-lg shadow-2xl border border-stone-200 p-1">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={getImageUrl(page)}
+                          src={
+                            page.crop?.xStart !== undefined
+                              ? `/api/image?url=${encodeURIComponent(page.photo_original || page.photo)}&w=800&q=80&cx=${page.crop.xStart}&cw=${page.crop.xEnd}`
+                              : `/api/image?url=${encodeURIComponent(page.photo_original || page.photo)}&w=800&q=80`
+                          }
                           alt={`Page ${index + 1}`}
-                          className="w-64 h-auto object-contain rounded"
+                          className="w-80 h-auto object-contain rounded"
                         />
                       </div>
                     </div>
